@@ -34,6 +34,9 @@
         .timeline-hour { position: absolute; left: -35px; font-size: 10px; color: #6b7280; height: 25px; line-height: 25px; }
         .time-block { position: absolute; left: 2px; right: 2px; border-radius: 4px; font-size: 10px; padding: 2px; overflow: hidden; color: white; opacity: 0.9; box-shadow: 1px 1px 2px rgba(0,0,0,0.1); transition: all 0.2s; z-index: 10; cursor: pointer; }
         .time-block:hover { z-index: 20; transform: scale(1.02); opacity: 1; }
+        /* 削除ボタンのホバー表示 */
+        .task-item:hover .delete-btn { opacity: 1; }
+        .delete-btn { opacity: 0.3; transition: opacity 0.2s; }
 
         /* やらないことリストのアニメーション */
         @keyframes bounce-sm {
@@ -335,7 +338,7 @@
         }
 
         function deleteGoal(id) {
-            if(confirm('このカテゴリとタスクを削除しますか？')) {
+            if(confirm('【警告】カテゴリを削除しますか？\n\nここに含まれる「すべてのタスク」も一緒に消えてしまいます。\n個別のタスクを消したい場合は、各タスクのゴミ箱ボタンを使用してください。')) {
                 goals = goals.filter(g => g.id !== id);
                 saveData();
             }
@@ -360,11 +363,22 @@
                 }
             }
         }
+        
+        // 個別タスクの削除（新規追加機能）
+        function deleteTask(goalId, taskId) {
+            if(confirm('このタスクを削除しますか？')) {
+                const goal = goals.find(g => g.id === goalId);
+                if(goal) {
+                    goal.tasks = goal.tasks.filter(t => t.id !== taskId);
+                    saveData();
+                }
+            }
+        }
 
         function quickAddTaskToDate() {
             let defaultGoal = goals[0]; 
             if(!defaultGoal) {
-                defaultGoal = { id: Date.now(), title: '一般', tasks: [] };
+                defaultGoal = { id: Date.now(), title: 'スケジュール管理', tasks: [] };
                 goals.push(defaultGoal);
             }
             const name = prompt("タスク名を入力してください:", "");
@@ -434,7 +448,7 @@
 
             dailyTasks.forEach(task => {
                 const div = document.createElement('div');
-                div.className = `flex flex-col sm:flex-row items-center gap-2 p-3 rounded border shadow-sm ${task.completed ? 'bg-gray-100' : 'bg-white'}`;
+                div.className = `flex flex-col sm:flex-row items-center gap-2 p-3 rounded border shadow-sm task-item ${task.completed ? 'bg-gray-100' : 'bg-white'}`;
                 const borderClass = task.priority === 'high' ? 'border-l-red-500' : (task.priority === 'low' ? 'border-l-gray-400' : 'border-l-blue-500');
                 div.classList.add('border-l-4', borderClass);
 
@@ -452,6 +466,7 @@
                             <input type="number" value="${task.duration}" onchange="updateTaskDetails(${task.goalId}, ${task.id}, 'duration', this.value)" class="w-12 text-xs p-1 border rounded shadow-sm">
                             <span class="text-xs text-gray-500">分</span>
                         </div>
+                        <button onclick="deleteTask(${task.goalId}, ${task.id})" class="text-gray-400 hover:text-red-500 px-2 py-1 delete-btn" title="削除"><i class="fa-solid fa-trash-can"></i></button>
                     </div>
                 `;
                 container.appendChild(div);
@@ -586,7 +601,7 @@
                 let prioClass = t.priority === 'high' ? 'prio-high' : (t.priority === 'low' ? 'prio-low' : 'prio-mid');
                 if(t.completed) prioClass = 'bg-gray-100 border-l-4 border-gray-300'; 
 
-                div.className = `flex items-center p-3 rounded shadow-sm transition ${prioClass}`;
+                div.className = `flex items-center p-3 rounded shadow-sm transition task-item ${prioClass}`;
                 div.innerHTML = `
                     <button onclick="toggleTask(${t.goalId}, ${t.id})" class="mr-3 w-6 h-6 rounded-full border border-gray-400 bg-white flex justify-center items-center hover:bg-indigo-50 transition">
                         ${t.completed ? '<i class="fa-solid fa-check text-indigo-500"></i>' : '<span class="w-full h-full rounded-full"></span>'}
@@ -598,6 +613,7 @@
                             ${t.startTime ? `<span class="font-bold text-indigo-600"><i class="fa-regular fa-clock"></i> ${t.startTime} (${t.duration}分)</span>` : ''}
                         </div>
                     </div>
+                    <button onclick="deleteTask(${t.goalId}, ${t.id})" class="text-gray-400 hover:text-red-500 px-3 py-2 delete-btn" title="削除"><i class="fa-solid fa-trash-can"></i></button>
                 `;
                 dashList.appendChild(div);
             });
@@ -611,12 +627,15 @@
                 sortedTasks.forEach(t => {
                     let color = t.priority === 'high' ? 'text-red-500' : (t.priority === 'low' ? 'text-gray-400' : 'text-blue-500');
                     tasksHtml += `
-                        <div class="flex justify-between items-center p-2 border-b text-sm hover:bg-gray-50">
+                        <div class="flex justify-between items-center p-2 border-b text-sm hover:bg-gray-50 group">
                             <div class="flex items-center gap-2">
                                 <i class="fa-solid fa-circle text-[6px] ${color}"></i>
                                 <span class="${t.completed?'line-through text-gray-300':''}">${t.title}</span>
                             </div>
-                            <div class="text-xs text-gray-400">${t.date.slice(5)}</div>
+                            <div class="flex items-center gap-2">
+                                <div class="text-xs text-gray-400">${t.date.slice(5)}</div>
+                                <button onclick="deleteTask(${g.id}, ${t.id})" class="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition"><i class="fa-solid fa-xmark"></i></button>
+                            </div>
                         </div>`;
                 });
 
@@ -627,7 +646,7 @@
                         <h3 class="font-bold text-lg text-gray-700">${g.title}</h3>
                         <div class="flex gap-2">
                             <button onclick="openSuggest(${g.id}, '${g.title}')" class="text-xs bg-indigo-50 text-indigo-600 px-2 py-1 rounded hover:bg-indigo-100 transition"><i class="fa-solid fa-wand-magic-sparkles"></i> 提案</button>
-                            <button onclick="deleteGoal(${g.id})" class="text-gray-400 hover:text-red-500 transition"><i class="fa-solid fa-trash"></i></button>
+                            <button onclick="deleteGoal(${g.id})" class="text-xs text-gray-400 hover:text-red-500 border border-gray-300 px-2 py-1 rounded hover:bg-red-50 transition">削除</button>
                         </div>
                     </div>
                     <div class="flex gap-1 mb-2 bg-gray-100 p-2 rounded">
